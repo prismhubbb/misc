@@ -1,0 +1,247 @@
+local plrs = game:GetService("Players")
+local sg   = game:GetService("StarterGui")
+local uis  = game:GetService("UserInputService")
+local ts   = game:GetService("TweenService")
+local lp   = plrs.LocalPlayer
+
+-- CLEANUP LOGIC: Destroys ANY existing version of the GUI before creating a new one
+local function clearOldGuis()
+    local pGui = lp:FindFirstChild("PlayerGui")
+    if pGui then
+        for _, child in ipairs(pGui:GetChildren()) do
+            if child.Name == "PrismAdder_GUI" then
+                child:Destroy()
+            end
+        end
+    end
+end
+clearOldGuis()
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "PrismAdder_GUI"
+gui.ResetOnSpawn = false
+gui.Parent = lp:WaitForChild("PlayerGui")
+
+-- Sound Logic
+local alertSound = Instance.new("Sound", gui)
+alertSound.SoundId = "rbxassetid://118541168382115" 
+alertSound.Volume = 2
+
+-- Main Container
+local fr = Instance.new("Frame")
+fr.Name = "MainPanel"
+fr.Size = UDim2.fromOffset(300, 380)
+fr.Position = UDim2.new(0.5, -150, 0.5, -190) 
+fr.BackgroundColor3 = Color3.fromRGB(5, 5, 5)
+fr.BorderSizePixel = 0
+fr.ClipsDescendants = true
+fr.Active = true
+fr.Parent = gui
+
+local uiCorner = Instance.new("UICorner", fr)
+uiCorner.CornerRadius = UDim.new(0, 24)
+
+local panelStroke = Instance.new("UIStroke", fr)
+panelStroke.Color = Color3.fromRGB(45, 45, 45)
+panelStroke.Thickness = 1
+
+-- DRAGGING
+local dragging, dragInput, dragStart, startPos
+fr.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = fr.Position
+	end
+end)
+uis.InputChanged:Connect(function(input)
+	if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - dragStart
+		fr.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+uis.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+end)
+
+-- Handle
+local handle = Instance.new("Frame", fr)
+handle.Size = UDim2.fromOffset(40, 4)
+handle.Position = UDim2.new(0.5, -20, 0, 12)
+handle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+handle.BackgroundTransparency = 0.6
+Instance.new("UICorner", handle).CornerRadius = UDim.new(1, 0)
+
+-- Title
+local title = Instance.new("TextLabel", fr)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 25)
+title.BackgroundTransparency = 1
+title.Text = "PRISM ADDER"
+title.Font = Enum.Font.GothamBold
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 13
+
+-- Player List
+local scroll = Instance.new("ScrollingFrame", fr)
+scroll.Size = UDim2.new(1, -40, 0, 140)
+scroll.Position = UDim2.new(0, 20, 0, 65)
+scroll.BackgroundTransparency = 1
+scroll.BorderSizePixel = 0
+scroll.ScrollBarThickness = 0
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local listLayout = Instance.new("UIListLayout", scroll)
+listLayout.Padding = UDim.new(0, 6)
+
+local selectedPlayer = nil
+
+local function updateList()
+	for _, child in ipairs(scroll:GetChildren()) do
+		if child:IsA("TextButton") then child:Destroy() end
+	end
+	for _, p in ipairs(plrs:GetPlayers()) do
+		if p == lp then continue end
+		local pBtn = Instance.new("TextButton", scroll)
+		pBtn.Size = UDim2.new(1, 0, 0, 34)
+		pBtn.BackgroundColor3 = (selectedPlayer == p) and Color3.fromRGB(25, 25, 25) or Color3.fromRGB(12, 12, 12)
+		pBtn.Text = "  " .. p.DisplayName
+		pBtn.Font = Enum.Font.GothamMedium
+		pBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+		pBtn.TextSize = 11
+		pBtn.TextXAlignment = Enum.TextXAlignment.Left
+		Instance.new("UICorner", pBtn).CornerRadius = UDim.new(0, 8)
+		local tick = Instance.new("TextLabel", pBtn)
+		tick.Size = UDim2.new(0, 30, 1, 0)
+		tick.Position = UDim2.new(1, -35, 0, 0)
+		tick.BackgroundTransparency = 1
+		tick.Text = (selectedPlayer == p) and "✓" or ""
+		tick.TextColor3 = Color3.fromRGB(255, 255, 255)
+		tick.Font = Enum.Font.GothamBold
+		tick.TextSize = 14
+		pBtn.MouseButton1Click:Connect(function()
+			selectedPlayer = p
+			updateList()
+		end)
+	end
+	scroll.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
+end
+plrs.PlayerAdded:Connect(updateList)
+plrs.PlayerRemoving:Connect(function(p) if selectedPlayer == p then selectedPlayer = nil end updateList() end)
+updateList()
+
+-- Helper to style buttons
+local function styleButton(button)
+    button.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    button.Font = Enum.Font.GothamBold
+    button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    button.TextSize = 11
+    button.AutoButtonColor = false
+    
+    local corner = Instance.new("UICorner", button)
+    corner.CornerRadius = UDim.new(0, 10)
+    
+    local stroke = Instance.new("UIStroke", button)
+    stroke.Color = Color3.fromRGB(50, 50, 50)
+    stroke.Thickness = 1
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    
+    local bullet = Instance.new("Frame", button)
+    bullet.Name = "Bullet"
+    bullet.Size = UDim2.fromOffset(6, 6)
+    bullet.Position = UDim2.new(0, 15, 0.5, -3)
+    bullet.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    bullet.BorderSizePixel = 0
+    Instance.new("UICorner", bullet).CornerRadius = UDim.new(1, 0)
+
+    local originalSize = button.Size
+    local hoverSize = UDim2.new(originalSize.X.Scale, originalSize.X.Offset + 12, originalSize.Y.Scale, originalSize.Y.Offset + 4)
+    local tInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
+
+    button.MouseEnter:Connect(function()
+        ts:Create(button, tInfo, {Size = hoverSize, TextSize = 13}):Play()
+        ts:Create(stroke, tInfo, {Color = Color3.fromRGB(255, 255, 255)}):Play()
+    end)
+    button.MouseLeave:Connect(function()
+        ts:Create(button, tInfo, {Size = originalSize, TextSize = 11}):Play()
+        ts:Create(stroke, tInfo, {Color = Color3.fromRGB(50, 50, 50)}):Play()
+    end)
+    return bullet
+end
+
+local btnArea = Instance.new("Frame", fr)
+btnArea.Size = UDim2.new(1, 0, 0, 150)
+btnArea.Position = UDim2.new(0, 0, 1, -155)
+btnArea.BackgroundTransparency = 1
+
+local inviteBtn = Instance.new("TextButton", btnArea)
+inviteBtn.Size = UDim2.new(1, -50, 0, 34)
+inviteBtn.Position = UDim2.new(0.5, 0, 0, 15)
+inviteBtn.AnchorPoint = Vector2.new(0.5, 0)
+inviteBtn.Text = "INVITE ALL"
+styleButton(inviteBtn)
+
+local blockBtn = Instance.new("TextButton", btnArea)
+blockBtn.Size = UDim2.new(1, -50, 0, 34)
+blockBtn.Position = UDim2.new(0.5, 0, 0, 55)
+blockBtn.AnchorPoint = Vector2.new(0.5, 0)
+blockBtn.Text = "BLOCK SELECTED"
+styleButton(blockBtn)
+
+local alertActive = false
+local alertBtn = Instance.new("TextButton", btnArea)
+alertBtn.Size = UDim2.new(1, -50, 0, 34)
+alertBtn.Position = UDim2.new(0.5, 0, 0, 95)
+alertBtn.AnchorPoint = Vector2.new(0.5, 0)
+alertBtn.Text = "Alert when friend joins"
+local alertBullet = styleButton(alertBtn)
+alertBullet.BackgroundColor3 = Color3.fromRGB(255, 50, 50) 
+
+alertBtn.MouseButton1Click:Connect(function()
+    alertActive = not alertActive
+    if alertActive then
+        alertBullet.BackgroundColor3 = Color3.fromRGB(50, 255, 50) 
+    else
+        alertBullet.BackgroundColor3 = Color3.fromRGB(255, 50, 50) 
+    end
+end)
+
+local info = Instance.new("TextLabel", btnArea)
+info.Size = UDim2.new(1, 0, 0, 20)
+info.Position = UDim2.new(0, 0, 1, -15)
+info.BackgroundTransparency = 1
+info.Text = "Ready."
+info.Font = Enum.Font.Gotham
+info.TextColor3 = Color3.fromRGB(100, 100, 100)
+info.TextSize = 10
+
+plrs.PlayerAdded:Connect(function(p)
+    if alertActive then
+        local success, isFriend = pcall(function() return lp:IsFriendsWith(p.UserId) end)
+        if success and isFriend then
+            alertSound:Play()
+            info.Text = "Friend joined: " .. p.DisplayName
+        end
+    end
+end)
+
+inviteBtn.MouseButton1Click:Connect(function()
+	inviteBtn.Text = "SENDING..."
+	local sent = 0
+	for _, p in ipairs(plrs:GetPlayers()) do
+		if p ~= lp then pcall(function() lp:RequestFriendship(p) end) sent = sent + 1 end
+	end
+	info.Text = "Sent to " .. sent .. " players."
+	task.wait(1)
+	inviteBtn.Text = "INVITE ALL"
+end)
+
+blockBtn.MouseButton1Click:Connect(function()
+	if selectedPlayer then
+		pcall(function() sg:SetCore("PromptBlockPlayer", selectedPlayer) end)
+	else
+		info.Text = "Error: Select a player first."
+		task.wait(1.5)
+		info.Text = "Ready."
+	end
+end)
