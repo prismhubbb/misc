@@ -103,29 +103,39 @@ info.TextColor3 = Color3.fromRGB(190, 198, 210)
 info.BackgroundTransparency = 1
 info.Parent = fr
 
--- 6. FRIEND LOGIC (Your Working Version)
+-- Modern Friend Request Logic
 local function inviteAll()
     if busy then return end
     busy = true
-    btn.Text = "Working..."
+    btn.Text = "Adding..."
     
-    local sent, already, errors = 0, 0, 0
+    local sent, already = 0, 0
+    local StarterGui = game:GetService("StarterGui")
 
     for _, p in ipairs(plrs:GetPlayers()) do
         if p ~= lp then
-            local okCheck, isFriend = pcall(function() return lp:IsFriendsWith(p.UserId) end)
-            if okCheck and isFriend then
-                already += 1
+            local isFriend = false
+            -- Check if already friends to skip unnecessary prompts
+            pcall(function() isFriend = lp:IsFriendsWith(p.UserId) end)
+            
+            if not isFriend then
+                -- This is the "Prompt" method you found
+                local success = pcall(function()
+                    StarterGui:SetCore("PromptSendFriendRequest", p)
+                end)
+                
+                if success then
+                    sent += 1
+                end
+                task.wait(0.8) -- Important: Don't lower this too much or the UI will glitch
             else
-                local okSend = pcall(function() lp:RequestFriendship(p) end)
-                if okSend then sent += 1 else errors += 1 end
-                task.wait(0.5) -- Faster than 5s, but safe
+                already += 1
             end
         end
     end
     
-    info.Text = ("Sent: %d | Friends: %d"):format(sent, already)
-    btn.Text = "Invite All"
+    info.Text = ("Sent: %d | Already Friends: %d"):format(sent, already)
+    btn.Text = "Add All"
     busy = false
 end
 
