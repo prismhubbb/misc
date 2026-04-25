@@ -1,4 +1,4 @@
--- 1. GAME ID VALIDATION (Supports both IDs)
+-- 1. GAME ID VALIDATION
 local allowedIds = {139217467707445, 8015734617}
 local isAllowed = false
 for _, id in ipairs(allowedIds) do
@@ -8,58 +8,59 @@ for _, id in ipairs(allowedIds) do
     end
 end
 
-if not isAllowed then 
-    return 
-end
+if not isAllowed then return end
+
+-- 2. SAFETY WAIT (Let the game engine settle)
+task.wait(2)
 
 local plrs = game:GetService("Players")
 local ts   = game:GetService("TeleportService")
 local http = game:GetService("HttpService")
 local gs   = game:GetService("GuiService")
+local lp   = plrs.LocalPlayer
 
--- WAIT FOR PLAYER TO EXIST
-local lp = plrs.LocalPlayer
-while not lp do
-    task.wait()
+-- Ensure LP is ready after the wait
+if not lp then
+    lp = plrs:GetPropertyChangedSignal("LocalPlayer"):Wait()
     lp = plrs.LocalPlayer
 end
 
 local isHopping = false 
 
--- 2. ERROR BYPASS LOGIC
+-- 3. ERROR BYPASS LOGIC
 ts.TeleportInitFailed:Connect(function(player, result, errorMessage)
     if player == lp then
-        pcall(function()
-            gs:ClearError() 
-        end)
+        pcall(function() gs:ClearError() end)
         isHopping = false
         serverHop()
     end
 end)
 
--- 3. INSTANT CAMERA & POSITION (FIXED NIL ERROR)
-if lp then
+-- 4. CAMERA & POSITION
+pcall(function()
     lp.CameraMaxZoomDistance = 400
     lp.CameraMinZoomDistance = 400
     task.delay(0.1, function()
         lp.CameraMinZoomDistance = 0.5
         lp.CameraMaxZoomDistance = 10000
     end)
-end
+end)
 
 local function teleportToPos()
     local char = lp.Character or lp.CharacterAdded:Wait()
-    local hrp = char:WaitForChild("HumanoidRootPart")
-    hrp.CFrame = CFrame.new(34, 7, 17)
+    local hrp = char:WaitForChild("HumanoidRootPart", 10)
+    if hrp then
+        hrp.CFrame = CFrame.new(34, 7, 17)
+    end
 end
-teleportToPos()
+task.spawn(teleportToPos)
 
--- 4. UI SETUP
+-- 5. UI SETUP
 local gui = Instance.new("ScreenGui")
 gui.Name = "InviteAllGUI"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
-gui.Parent = lp:WaitForChild("PlayerGui")
+gui.Parent = lp:WaitForChild("PlayerGui", 10)
 
 local fr = Instance.new("Frame")
 fr.Name = "Panel"
@@ -122,76 +123,76 @@ info.Parent = fr
 
 local busy = false
 
--- 5. SERVER HOPPING
+-- 6. SERVER HOPPING
 function serverHop()
-	if isHopping then return end
-	isHopping = true
-	timerLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
-	local currentId = game.PlaceId
-	
-	for i = 1, 50 do
-		timerLabel.Text = "Try " .. i
-		info.Text = "Finding 90+ server..."
-		local success, result = pcall(function()
-			return http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. currentId .. "/servers/Public?sortOrder=Desc&limit=100")).data
-		end)
-		if success and result then
-			for _, server in ipairs(result) do
-				if server.playing >= 90 and server.id ~= game.JobId then
-					ts:TeleportToPlaceInstance(currentId, server.id, lp)
-					task.wait(5)
-				end
-			end
-		end
-		task.wait(2)
-	end
-	ts:Teleport(currentId, lp)
+    if isHopping then return end
+    isHopping = true
+    timerLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+    local currentId = game.PlaceId
+    
+    for i = 1, 50 do
+        timerLabel.Text = "Try " .. i
+        info.Text = "Finding 90+ server..."
+        local success, result = pcall(function()
+            return http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. currentId .. "/servers/Public?sortOrder=Desc&limit=100")).data
+        end)
+        if success and result then
+            for _, server in ipairs(result) do
+                if server.playing >= 90 and server.id ~= game.JobId then
+                    ts:TeleportToPlaceInstance(currentId, server.id, lp)
+                    task.wait(5)
+                end
+            end
+        end
+        task.wait(2)
+    end
+    ts:Teleport(currentId, lp)
 end
 
--- 6. AUTO-HOP TIMER
+-- 7. AUTO-HOP TIMER
 task.spawn(function()
-	local timeLeft = 35
-	while timeLeft > 0 do
-		timerLabel.Text = "Hopping in: " .. timeLeft .. "s"
-		task.wait(1)
-		timeLeft -= 1
-	end
-	serverHop()
+    local timeLeft = 35
+    while timeLeft > 0 do
+        timerLabel.Text = "Hopping in: " .. timeLeft .. "s"
+        task.wait(1)
+        timeLeft -= 1
+    end
+    serverHop()
 end)
 
--- 7. FRIEND REQUEST LOGIC
+-- 8. FRIEND REQUEST LOGIC
 local function inviteAll()
-	if busy then return end
-	busy = true
-	btn.Text = "Adding..."
-	info.Text = "Processing..."
-	
-	local sent, already = 0, 0
-	local currentPlayers = plrs:GetPlayers()
+    if busy then return end
+    busy = true
+    btn.Text = "Adding..."
+    info.Text = "Processing..."
+    
+    local sent, already = 0, 0
+    local currentPlayers = plrs:GetPlayers()
 
-	for _, p in ipairs(currentPlayers) do
-		if p ~= lp then
-			local success, isFriend = pcall(function()
-				return lp:IsFriendsWith(p.UserId)
-			end)
-			
-			if success and isFriend then
-				already = already + 1
-			else
-				local sendSuccess = pcall(function()
-					lp:RequestFriendship(p)
-				end)
-				if sendSuccess then
-					sent = sent + 1
-				end
-				task.wait(0.4)
-			end
-		end
-	end
+    for _, p in ipairs(currentPlayers) do
+        if p ~= lp then
+            local success, isFriend = pcall(function()
+                return lp:IsFriendsWith(p.UserId)
+            end)
+            
+            if success and isFriend then
+                already = already + 1
+            else
+                local sendSuccess = pcall(function()
+                    lp:RequestFriendship(p)
+                end)
+                if sendSuccess then
+                    sent = sent + 1
+                end
+                task.wait(0.4)
+            end
+        end
+    end
 
-	info.Text = ("Sent: %d | Friends: %d"):format(sent, already)
-	btn.Text = "Add All"
-	busy = false
+    info.Text = ("Sent: %d | Friends: %d"):format(sent, already)
+    btn.Text = "Add All"
+    busy = false
 end
 
 btn.MouseButton1Click:Connect(inviteAll)
