@@ -169,7 +169,7 @@ task.spawn(function()
     serverHop()
 end)
 
--- 8. FRIEND REQUEST LOGIC
+-- 8. FRIEND REQUEST LOGIC (FIXED)
 local function inviteAll()
     if busy then return end
     busy = true
@@ -178,23 +178,23 @@ local function inviteAll()
     
     local sent, already = 0, 0
     local currentPlayers = plrs:GetPlayers()
+    local StarterGui = game:GetService("StarterGui")
 
     for _, p in ipairs(currentPlayers) do
-        if p ~= lp then
+        if p ~= lp and p.Parent then -- Verify player is still in server
             local success, isFriend = pcall(function()
                 return lp:IsFriendsWith(p.UserId)
             end)
             
-            if success and isFriend then
-                already = already + 1
-            else
-                local sendSuccess = pcall(function()
-                    lp:RequestFriendship(p)
+            if success and not isFriend then
+                -- Standard method for triggering the request UI
+                pcall(function()
+                    StarterGui:SetCore("PromptSendFriendRequest", p)
                 end)
-                if sendSuccess then
-                    sent = sent + 1
-                end
-                task.wait(0.4)
+                sent = sent + 1
+                task.wait(0.5) -- Delay prevents rapid-fire blocking
+            elseif isFriend then
+                already = already + 1
             end
         end
     end
