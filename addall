@@ -38,15 +38,22 @@ ts.TeleportInitFailed:Connect(function(player, result, errorMessage)
     end
 end)
 
--- 4. CAMERA & POSITION
+-- 4. CAMERA & POSITION (FORCED ZOOM)
+local targetZoom = 400 -- The distance you want to force them to
+
 pcall(function()
-    lp.CameraMaxZoomDistance = 400
-    lp.CameraMinZoomDistance = 400
-    task.delay(0.1, function()
-        lp.CameraMinZoomDistance = 0.5
-        lp.CameraMaxZoomDistance = 10000
-    end)
+    -- Set MAX first so the limit is high enough for the MIN
+    lp.CameraMaxZoomDistance = targetZoom
+    lp.CameraMinZoomDistance = targetZoom
+    
+    -- Crucial: Wait a frame to let the engine snap the camera
+    task.wait(0.1) 
+    
+    -- Now unlock it so the player can zoom further out if they want
+    lp.CameraMaxZoomDistance = 10000 
+    lp.CameraMinZoomDistance = 0.5
 end)
+
 
 local function teleportToPos()
     local char = lp.Character or lp.CharacterAdded:Wait()
