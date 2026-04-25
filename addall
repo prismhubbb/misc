@@ -19,10 +19,12 @@ local http = game:GetService("HttpService")
 local gs   = game:GetService("GuiService")
 local lp   = plrs.LocalPlayer
 
--- Ensure LP is ready after the wait
-if not lp then
-    lp = plrs:GetPropertyChangedSignal("LocalPlayer"):Wait()
+-- Ensure LocalPlayer is ready
+local lp = plrs.LocalPlayer
+while not lp do
+    plrs:GetPropertyChangedSignal("LocalPlayer"):Wait()
     lp = plrs.LocalPlayer
+    task.wait()
 end
 
 local isHopping = false 
