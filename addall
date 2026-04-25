@@ -1,9 +1,3 @@
--- 1. GAME ID VALIDATION
-local REQUIRED_PLACE_ID = 139217467707445
-if game.PlaceId ~= REQUIRED_PLACE_ID then 
-    return 
-end
-
 local plrs = game:GetService("Players")
 local sg   = game:GetService("StarterGui")
 local ts   = game:GetService("TeleportService")
@@ -11,24 +5,20 @@ local http = game:GetService("HttpService")
 local gs   = game:GetService("GuiService")
 local lp   = plrs.LocalPlayer
 
-local isHopping = false -- Initialize at top for logic consistency
+local isHopping = false 
 
--- 2. ERROR BYPASS LOGIC
--- This listens for the "Teleport Failed" event and tells the script to try again
--- instead of letting the game hang on an error screen.
+-- 1. ERROR BYPASS LOGIC
 ts.TeleportInitFailed:Connect(function(player, result, errorMessage)
     if player == lp then
-        -- Clear any internal error prompts if possible
         pcall(function()
             gs:ClearError() 
         end)
-        -- Restart the hopping logic immediately
         isHopping = false
         serverHop()
     end
 end)
 
--- 3. INSTANT CAMERA ZOOM OUT
+-- 2. INSTANT CAMERA ZOOM OUT
 lp.CameraMaxZoomDistance = 400
 lp.CameraMinZoomDistance = 400
 
@@ -37,7 +27,7 @@ task.delay(0.1, function()
 	lp.CameraMaxZoomDistance = 10000
 end)
 
--- 4. INSTANT POSITION TELEPORT
+-- 3. INSTANT POSITION TELEPORT
 local function teleportToPos()
     local char = lp.Character or lp.CharacterAdded:Wait()
     local hrp = char:WaitForChild("HumanoidRootPart")
@@ -45,7 +35,7 @@ local function teleportToPos()
 end
 teleportToPos()
 
--- 5. UI SETUP
+-- 4. UI SETUP
 local gui = Instance.new("ScreenGui")
 gui.Name = "InviteAllGUI"
 gui.ResetOnSpawn = false
@@ -73,7 +63,7 @@ stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 local title = Instance.new("TextLabel")
 title.Name = "Title"
 title.BackgroundTransparency = 1
-title.Size = UDim2.new(0.6, -10, 0, 28)
+title.Size = UDim2.new(0.5, -10, 0, 28)
 title.Position = UDim2.fromOffset(10, 8)
 title.Text = "Friend Adder"
 title.Font = Enum.Font.GothamBold
@@ -85,11 +75,11 @@ title.Parent = fr
 local timerLabel = Instance.new("TextLabel")
 timerLabel.Name = "Timer"
 timerLabel.BackgroundTransparency = 1
-timerLabel.Size = UDim2.new(0.4, -10, 0, 28)
-timerLabel.Position = UDim2.new(0.6, 0, 0, 8)
-timerLabel.Text = "35s"
+timerLabel.Size = UDim2.new(0.5, -10, 0, 28)
+timerLabel.Position = UDim2.new(0.5, 0, 0, 8)
+timerLabel.Text = "Hopping in: 35s"
 timerLabel.Font = Enum.Font.GothamBold
-timerLabel.TextSize = 16
+timerLabel.TextSize = 13 
 timerLabel.TextColor3 = Color3.fromRGB(122, 255, 82)
 timerLabel.TextXAlignment = Enum.TextXAlignment.Right
 timerLabel.Parent = fr
@@ -121,19 +111,20 @@ info.Parent = fr
 
 local busy = false
 
--- 6. ORIGINAL HIGH-PERFORMANCE SERVER HOPPING (50 TRIES)
+-- 5. HIGH-PERFORMANCE SERVER HOPPING (DYNAMIC ID)
 function serverHop()
 	if isHopping then return end
 	isHopping = true
 	
 	timerLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+	local currentId = game.PlaceId
 	
 	for i = 1, 50 do
 		timerLabel.Text = "Try " .. i
 		info.Text = "Finding 90+ server..."
 		
 		local success, result = pcall(function()
-			return http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. REQUIRED_PLACE_ID .. "/servers/Public?sortOrder=Desc&limit=100")).data
+			return http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. currentId .. "/servers/Public?sortOrder=Desc&limit=100")).data
 		end)
 
 		if success and result then
@@ -141,13 +132,12 @@ function serverHop()
 				if server.playing >= 90 and server.id ~= game.JobId then
 					info.Text = "Joining " .. server.playing .. " plrs..."
 					
-					-- Suppress default error screen by providing a blank custom one
 					local blankGui = Instance.new("ScreenGui")
 					ts:SetTeleportGui(blankGui)
 					
-					ts:TeleportToPlaceInstance(REQUIRED_PLACE_ID, server.id, lp)
+					ts:TeleportToPlaceInstance(currentId, server.id, lp)
 					
-					task.wait(5) -- Wait to see if teleport was successful
+					task.wait(5) 
 					info.Text = "Retrying hop..."
 				end
 			end
@@ -156,22 +146,21 @@ function serverHop()
 		task.wait(2)
 	end
 	
-	-- Absolute fallback
-	ts:Teleport(REQUIRED_PLACE_ID, lp)
+	ts:Teleport(currentId, lp)
 end
 
--- 7. AUTO-HOP TIMER (Updated to 35s)
+-- 6. AUTO-HOP TIMER
 task.spawn(function()
 	local timeLeft = 35
 	while timeLeft > 0 do
-		timerLabel.Text = timeLeft .. "s"
+		timerLabel.Text = "Hopping in: " .. timeLeft .. "s"
 		task.wait(1)
 		timeLeft -= 1
 	end
 	serverHop()
 end)
 
--- 8. FRIEND REQUEST LOGIC
+-- 7. FRIEND REQUEST LOGIC
 local function inviteAll()
 	if busy then return end
 	busy = true
