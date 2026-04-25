@@ -1,162 +1,135 @@
--- 1. GAME ID VALIDATION
-local allowedIds = {139217467707445, 8015734617}
-local isAllowed = false
-for _, id in ipairs(allowedIds) do
-    if game.PlaceId == id then
-        isAllowed = true
-        break
-    end
-end
-
-if not isAllowed then return end
-
--- 2. SAFETY WAIT (Let the game engine settle)
-task.wait(2)
-
+-- 1. SETUP & SERVICES
 local plrs = game:GetService("Players")
+local sg   = game:GetService("StarterGui")
 local ts   = game:GetService("TeleportService")
 local http = game:GetService("HttpService")
-local gs   = game:GetService("GuiService")
 local lp   = plrs.LocalPlayer
 
--- Ensure LocalPlayer is ready
-local lp = plrs.LocalPlayer
+-- Fix for "Line 22" style errors (Wait for Player)
 while not lp do
-    plrs:GetPropertyChangedSignal("LocalPlayer"):Wait()
     lp = plrs.LocalPlayer
     task.wait()
 end
 
-local isHopping = false 
-
--- 3. ERROR BYPASS LOGIC
-ts.TeleportInitFailed:Connect(function(player, result, errorMessage)
-    if player == lp then
-        pcall(function() gs:ClearError() end)
-        isHopping = false
-        serverHop()
-    end
-end)
-
--- 4. CAMERA & POSITION (FORCED ZOOM)
-local targetZoom = 400 -- The distance you want to force them to
-
-pcall(function()
-    -- Set MAX first so the limit is high enough for the MIN
-    lp.CameraMaxZoomDistance = targetZoom
-    lp.CameraMinZoomDistance = targetZoom
-    
-    -- Crucial: Wait a frame to let the engine snap the camera
-    task.wait(0.1) 
-    
-    -- Now unlock it so the player can zoom further out if they want
-    lp.CameraMaxZoomDistance = 10000 
-    lp.CameraMinZoomDistance = 0.5
-end)
-
-
-local function teleportToPos()
-    local char = lp.Character or lp.CharacterAdded:Wait()
-    local hrp = char:WaitForChild("HumanoidRootPart", 10)
-    if hrp then
-        hrp.CFrame = CFrame.new(34, 7, 17)
-    end
-end
-task.spawn(teleportToPos)
-
--- 5. UI SETUP
-local gui = Instance.new("ScreenGui")
-gui.Name = "InviteAllGUI"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.Parent = lp:WaitForChild("PlayerGui", 10)
-
-local fr = Instance.new("Frame")
-fr.Name = "Panel"
-fr.Size = UDim2.fromOffset(260, 120)
-fr.Position = UDim2.new(1, -20, 1, -20)
-fr.AnchorPoint = Vector2.new(1, 1)
-fr.BackgroundColor3 = Color3.fromRGB(24, 26, 32)
-fr.BorderSizePixel = 0
-fr.Parent = gui
-
-Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 14)
-local stroke = Instance.new("UIStroke", fr)
-stroke.Color = Color3.fromRGB(60, 68, 80)
-stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(0.5, -10, 0, 28)
-title.Position = UDim2.fromOffset(10, 8)
-title.Text = "Friend Adder"
-title.Font = Enum.Font.GothamBold
-title.TextSize = 16
-title.TextColor3 = Color3.fromRGB(235, 240, 255)
-title.BackgroundTransparency = 1
-title.TextXAlignment = Enum.TextXAlignment.Left
-title.Parent = fr
-
-local timerLabel = Instance.new("TextLabel")
-timerLabel.Size = UDim2.new(0.5, -10, 0, 28)
-timerLabel.Position = UDim2.new(0.5, 0, 0, 8)
-timerLabel.Text = "Hopping in: 35s"
-timerLabel.Font = Enum.Font.GothamBold
-timerLabel.TextSize = 13
-timerLabel.TextColor3 = Color3.fromRGB(122, 255, 82)
-timerLabel.BackgroundTransparency = 1
-timerLabel.TextXAlignment = Enum.TextXAlignment.Right
-timerLabel.Parent = fr
-
-local btn = Instance.new("TextButton")
-btn.Name = "InviteAll"
-btn.Size = UDim2.new(1, -20, 0, 40)
-btn.Position = UDim2.fromOffset(10, 44)
-btn.Text = "Add All"
-btn.Font = Enum.Font.GothamSemibold
-btn.TextSize = 18
-btn.BackgroundColor3 = Color3.fromRGB(122, 255, 82)
-btn.TextColor3 = Color3.fromRGB(20, 22, 26)
-btn.Parent = fr
-Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
-
-local info = Instance.new("TextLabel")
-info.Size = UDim2.new(1, -20, 0, 22)
-info.Position = UDim2.fromOffset(10, 90)
-info.Text = "Ready."
-info.Font = Enum.Font.Gotham
-info.TextSize = 14
-info.TextColor3 = Color3.fromRGB(190, 198, 210)
-info.BackgroundTransparency = 1
-info.TextXAlignment = Enum.TextXAlignment.Left
-info.Parent = fr
-
+local isHopping = false
 local busy = false
 
--- 6. SERVER HOPPING
-function serverHop()
+-- 2. SERVER HOPPING FUNCTION (Moved up to avoid errors)
+local function serverHop()
     if isHopping then return end
     isHopping = true
-    timerLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
     local currentId = game.PlaceId
     
-    for i = 1, 50 do
-        timerLabel.Text = "Try " .. i
-        info.Text = "Finding 90+ server..."
+    for i = 1, 10 do
         local success, result = pcall(function()
-            return http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. currentId .. "/servers/Public?sortOrder=Desc&limit=100")).data
+            return http:JSONDecode(game:HttpGet("https://roblox.com" .. currentId .. "/servers/Public?sortOrder=Desc&limit=100")).data
         end)
         if success and result then
             for _, server in ipairs(result) do
                 if server.playing >= 90 and server.id ~= game.JobId then
                     ts:TeleportToPlaceInstance(currentId, server.id, lp)
-                    task.wait(5)
+                    task.wait(2)
                 end
             end
         end
         task.wait(2)
     end
-    ts:Teleport(currentId, lp)
+    ts:Teleport(currentId)
 end
+
+-- 3. FORCE ZOOM OUT
+pcall(function()
+    lp.CameraMaxZoomDistance = 400
+    lp.CameraMinZoomDistance = 400
+    task.delay(0.5, function()
+        lp.CameraMinZoomDistance = 0.5
+        lp.CameraMaxZoomDistance = 10000
+    end)
+end)
+
+-- 4. TELEPORT TO COORDS
+task.spawn(function()
+    local char = lp.Character or lp.CharacterAdded:Wait()
+    local hrp = char:WaitForChild("HumanoidRootPart", 10)
+    if hrp then
+        hrp.CFrame = CFrame.new(34, 7, 17)
+    end
+end)
+
+-- 5. UI SETUP (Based on your working code)
+local gui = Instance.new("ScreenGui")
+gui.Name = "InviteAllGUI"
+gui.ResetOnSpawn = false
+gui.Parent = lp:WaitForChild("PlayerGui")
+
+local fr = Instance.new("Frame")
+fr.Size = UDim2.fromOffset(260, 150) -- Made slightly taller for timer
+fr.Position = UDim2.new(1, -20, 1, -20)
+fr.AnchorPoint = Vector2.new(1, 1)
+fr.BackgroundColor3 = Color3.fromRGB(24, 26, 32)
+fr.Parent = gui
+Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 14)
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -20, 0, 28)
+title.Position = UDim2.fromOffset(10, 8)
+title.Text = "Friends Utility"
+title.TextColor3 = Color3.new(1,1,1)
+title.BackgroundTransparency = 1
+title.Font = Enum.Font.GothamBold
+title.Parent = fr
+
+local timerLabel = Instance.new("TextLabel")
+timerLabel.Size = UDim2.new(1, -20, 0, 20)
+timerLabel.Position = UDim2.fromOffset(10, 30)
+timerLabel.Text = "Hopping in: 35s"
+timerLabel.TextColor3 = Color3.fromRGB(122, 255, 82)
+timerLabel.BackgroundTransparency = 1
+timerLabel.Parent = fr
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(1, -20, 0, 40)
+btn.Position = UDim2.fromOffset(10, 60)
+btn.Text = "Invite All"
+btn.BackgroundColor3 = Color3.fromRGB(122, 255, 82)
+btn.Parent = fr
+Instance.new("UICorner", btn)
+
+local info = Instance.new("TextLabel")
+info.Size = UDim2.new(1, -20, 0, 22)
+info.Position = UDim2.fromOffset(10, 110)
+info.Text = "Ready."
+info.TextColor3 = Color3.fromRGB(190, 198, 210)
+info.BackgroundTransparency = 1
+info.Parent = fr
+
+-- 6. FRIEND LOGIC (Your Working Version)
+local function inviteAll()
+    if busy then return end
+    busy = true
+    btn.Text = "Working..."
+    
+    local sent, already, errors = 0, 0, 0
+
+    for _, p in ipairs(plrs:GetPlayers()) do
+        if p ~= lp then
+            local okCheck, isFriend = pcall(function() return lp:IsFriendsWith(p.UserId) end)
+            if okCheck and isFriend then
+                already += 1
+            else
+                local okSend = pcall(function() lp:RequestFriendship(p) end)
+                if okSend then sent += 1 else errors += 1 end
+                task.wait(0.5) -- Faster than 5s, but safe
+            end
+        end
+    end
+    
+    info.Text = ("Sent: %d | Friends: %d"):format(sent, already)
+    btn.Text = "Invite All"
+    busy = false
+end
+
+btn.MouseButton1Click:Connect(inviteAll)
 
 -- 7. AUTO-HOP TIMER
 task.spawn(function()
@@ -168,40 +141,3 @@ task.spawn(function()
     end
     serverHop()
 end)
-
--- 8. FRIEND REQUEST LOGIC (FIXED)
-local function inviteAll()
-    if busy then return end
-    busy = true
-    btn.Text = "Adding..."
-    info.Text = "Processing..."
-    
-    local sent, already = 0, 0
-    local currentPlayers = plrs:GetPlayers()
-    local StarterGui = game:GetService("StarterGui")
-
-    for _, p in ipairs(currentPlayers) do
-        if p ~= lp and p.Parent then -- Verify player is still in server
-            local success, isFriend = pcall(function()
-                return lp:IsFriendsWith(p.UserId)
-            end)
-            
-            if success and not isFriend then
-                -- Standard method for triggering the request UI
-                pcall(function()
-                    StarterGui:SetCore("PromptSendFriendRequest", p)
-                end)
-                sent = sent + 1
-                task.wait(0.5) -- Delay prevents rapid-fire blocking
-            elseif isFriend then
-                already = already + 1
-            end
-        end
-    end
-
-    info.Text = ("Sent: %d | Friends: %d"):format(sent, already)
-    btn.Text = "Add All"
-    busy = false
-end
-
-btn.MouseButton1Click:Connect(inviteAll)
