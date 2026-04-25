@@ -16,7 +16,13 @@ local plrs = game:GetService("Players")
 local ts   = game:GetService("TeleportService")
 local http = game:GetService("HttpService")
 local gs   = game:GetService("GuiService")
-local lp   = plrs.LocalPlayer
+
+-- WAIT FOR PLAYER TO EXIST
+local lp = plrs.LocalPlayer
+while not lp do
+    task.wait()
+    lp = plrs.LocalPlayer
+end
 
 local isHopping = false 
 
@@ -31,13 +37,15 @@ ts.TeleportInitFailed:Connect(function(player, result, errorMessage)
     end
 end)
 
--- 3. INSTANT CAMERA & POSITION
-lp.CameraMaxZoomDistance = 400
-lp.CameraMinZoomDistance = 400
-task.delay(0.1, function()
-	lp.CameraMinZoomDistance = 0.5
-	lp.CameraMaxZoomDistance = 10000
-end)
+-- 3. INSTANT CAMERA & POSITION (FIXED NIL ERROR)
+if lp then
+    lp.CameraMaxZoomDistance = 400
+    lp.CameraMinZoomDistance = 400
+    task.delay(0.1, function()
+        lp.CameraMinZoomDistance = 0.5
+        lp.CameraMaxZoomDistance = 10000
+    end)
+end
 
 local function teleportToPos()
     local char = lp.Character or lp.CharacterAdded:Wait()
@@ -151,7 +159,7 @@ task.spawn(function()
 	serverHop()
 end)
 
--- 7. FRIEND REQUEST LOGIC (FIXED)
+-- 7. FRIEND REQUEST LOGIC
 local function inviteAll()
 	if busy then return end
 	busy = true
@@ -176,7 +184,7 @@ local function inviteAll()
 				if sendSuccess then
 					sent = sent + 1
 				end
-				task.wait(0.4) -- Delay to prevent rate limits
+				task.wait(0.4)
 			end
 		end
 	end
