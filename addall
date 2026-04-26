@@ -1,10 +1,11 @@
 -- ROBLOX AUTO FRIEND + SERVER HOP
--- FIXED HOPPER VERSION
+-- FIXED HOPPER + NO ERROR POPUPS VERSION
 
 local plrs = game:GetService("Players")
 local sg = game:GetService("StarterGui")
 local ts = game:GetService("TeleportService")
 local http = game:GetService("HttpService")
+local gs = game:GetService("GuiService")
 local lp = plrs.LocalPlayer
 
 repeat task.wait() until lp
@@ -12,18 +13,29 @@ repeat task.wait() until lp
 local isHopping = false
 local busy = false
 
--- SERVER HOPPING (FIXED LOGIC)
+-- 1. ERROR SUPPRESSION (Removes the "Server Full" or "Teleport Failed" GUI)
+ts.TeleportInitFailed:Connect(function(player, result, errorMessage)
+    if player == lp then
+        pcall(function()
+            gs:ClearError() -- Instantly removes the error popup
+        end)
+        isHopping = false -- Reset lock so the loop can try again
+    end
+end)
+
+-- 2. SERVER HOPPING (RELIABLE CONTINUOUS LOOP)
 local function serverHop()
     if isHopping then return end
     isHopping = true
     
     local placeId = game.PlaceId
     local currentJobId = game.JobId
+    local cursor = ""
     
-    -- Function to try and find a server
-    local function findServer(cursor)
+    -- This loop ensures it keeps trying until you actually teleport
+    while isHopping do
         local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Desc&limit=100"
-        if cursor then
+        if cursor ~= "" then
             url = url .. "&cursor=" .. cursor
         end
         
@@ -32,46 +44,24 @@ local function serverHop()
         end)
         
         if success and result and result.data then
-            return result
-        end
-        return nil
-    end
-
-    local result = findServer()
-    if result then
-        local foundServer = nil
-        
-        -- Priority 1: Find 90+ player server
-        for _, server in ipairs(result.data) do
-            if server.playing and server.playing >= 90 and server.id ~= currentJobId then
-                foundServer = server.id
-                break
-            end
-        end
-        
-        -- Priority 2: If no 90+ server, find ANY server that isn't this one
-        if not foundServer then
             for _, server in ipairs(result.data) do
                 if server.id ~= currentJobId and server.playing < server.maxPlayers then
-                    foundServer = server.id
-                    break
+                    -- Priority: 90+ players, otherwise just take the best available
+                    if server.playing >= 90 or #result.data < 10 then
+                        pcall(function()
+                            ts:TeleportToPlaceInstance(placeId, server.id, lp)
+                        end)
+                        task.wait(2) -- Wait for teleport to initiate or error to fire
+                    end
                 end
             end
+            
+            -- Move to next page if we didn't hop yet
+            cursor = result.nextPageCursor or ""
+            if cursor == "" then cursor = "" end -- Reset to start if at end
         end
-        
-        if foundServer then
-            ts:TeleportToPlaceInstance(placeId, foundServer, lp)
-        else
-            -- Priority 3: Last resort, standard teleport
-            ts:Teleport(placeId, lp)
-        end
-    else
-        ts:Teleport(placeId, lp)
+        task.wait(1)
     end
-    
-    -- Reset lock if teleport fails
-    task.wait(5)
-    isHopping = false
 end
 
 -- FORCE ZOOM OUT
@@ -316,4 +306,4 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
-print("[+] Friend Utility loaded - Auto hopper fixed")
+print("[+] Friend Utility loaded - Auto hopper loop fixed & Errors cleared")
