@@ -1,5 +1,5 @@
 -- ROBLOX AUTO FRIEND + SERVER HOP
--- FIXED HOPPER + NO ERROR POPUPS VERSION
+-- FIXED HOPPER VERSION
 
 local plrs = game:GetService("Players")
 local sg = game:GetService("StarterGui")
@@ -13,17 +13,7 @@ repeat task.wait() until lp
 local isHopping = false
 local busy = false
 
--- 1. ERROR SUPPRESSION
-ts.TeleportInitFailed:Connect(function(player, result, errorMessage)
-    if player == lp then
-        pcall(function()
-            gs:ClearError() 
-        end)
-        isHopping = false 
-    end
-end)
-
--- 2. SERVER HOPPING (FIXED TO CONTINUOUSLY LOOP)
+-- SERVER HOPPING (FIXED CONTINUOUS LOOP)
 local function serverHop()
     if isHopping then return end
     isHopping = true
@@ -38,22 +28,25 @@ local function serverHop()
             url = url .. "&cursor=" .. cursor
         end
         
-        local success, result = pcall(function()
+        local success, data = pcall(function()
             return http:JSONDecode(game:HttpGet(url))
         end)
         
-        if success and result and result.data then
-            for _, server in ipairs(result.data) do
-                if server.id ~= currentJobId and server.playing and server.playing < server.maxPlayers then
-                    if server.playing >= 90 or #result.data < 10 then
+        if success and data and data.data then
+            for _, server in ipairs(data.data) do
+                if server.playing and server.playing < server.maxPlayers and server.id ~= currentJobId then
+                    -- Priority: Large servers (90+ players)
+                    if server.playing >= 90 or #data.data < 10 then
                         pcall(function()
                             ts:TeleportToPlaceInstance(placeId, server.id, lp)
                         end)
-                        task.wait(2)
+                        task.wait(1.5)
+                        -- If teleport fails, ClearError removes the popup so we can try the next server
+                        pcall(function() gs:ClearError() end)
                     end
                 end
             end
-            cursor = result.nextPageCursor or ""
+            cursor = data.nextPageCursor or ""
         end
         task.wait(1)
     end
@@ -180,7 +173,7 @@ addBtn.MouseLeave:Connect(function()
     addBtn.BackgroundColor3 = Color3.fromRGB(122, 255, 82)
 end)
 
--- 3. AUTOMATED FRIEND REQUEST (STRICTLY YOUR LOGIC)
+-- AUTOMATED FRIEND REQUEST
 local function inviteAll()
     if busy then return end
     busy = true
@@ -234,7 +227,12 @@ end
 
 addBtn.MouseButton1Click:Connect(inviteAll)
 
--- UI CLEANUP FOR ERRORS
+-- Disable TeleportService error GUI
+pcall(function()
+    sg:SetCore("TopbarEnabled", true)
+end)
+
+-- Hide default teleport error messages
 local function hideTeleportErrors()
     for _, gui in pairs(lp.PlayerGui:GetChildren()) do
         if gui.Name:find("Teleport") or gui.Name:find("Error") then
@@ -255,7 +253,7 @@ task.spawn(function()
     local timeLeft = 35
     while timeLeft > 0 do
         timer.Text = string.format("Server hop in: %ds", timeLeft)
-        hideTeleportErrors()
+        hideTeleportErrors()  -- Keep cleaning errors
         task.wait(1)
         timeLeft = timeLeft - 1
     end
@@ -301,4 +299,4 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
-print("[+] Friend Utility loaded - Continuous Hopper & RequestFriendship Logic")
+print("[+] Friend Utility loaded - Auto hopper fixed")
