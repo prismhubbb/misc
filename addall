@@ -1,53 +1,81 @@
--- 1. SETUP & SERVICES
-local plrs = game:GetService("Players")
-local sg   = game:GetService("StarterGui")
-local ts   = game:GetService("TeleportService")
-local http = game:GetService("HttpService")
-local lp   = plrs.LocalPlayer
+-- ROBLOX AUTO FRIEND + SERVER HOP
+-- FIXED HOPPER VERSION
 
--- Fix for "Line 22" style errors (Wait for Player)
-while not lp do
-    lp = plrs.LocalPlayer
-    task.wait()
-end
+local plrs = game:GetService("Players")
+local sg = game:GetService("StarterGui")
+local ts = game:GetService("TeleportService")
+local http = game:GetService("HttpService")
+local lp = plrs.LocalPlayer
+
+repeat task.wait() until lp
 
 local isHopping = false
 local busy = false
 
--- 2. SERVER HOPPING FUNCTION (Moved up to avoid errors)
+-- SERVER HOPPING (ACTUALLY WORKS NOW)
 local function serverHop()
     if isHopping then return end
     isHopping = true
-    local currentId = game.PlaceId
     
-    for i = 1, 10 do
-        local success, result = pcall(function()
-            return http:JSONDecode(game:HttpGet("https://roblox.com" .. currentId .. "/servers/Public?sortOrder=Desc&limit=100")).data
+    local placeId = game.PlaceId
+    local attempts = 0
+    local maxAttempts = 50  -- Try up to 50 servers before giving up
+    
+    while attempts < maxAttempts do
+        attempts = attempts + 1
+        
+        local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100", placeId)
+        
+        local success, data = pcall(function()
+            return http:JSONDecode(game:HttpGet(url))
         end)
-        if success and result then
-            for _, server in ipairs(result) do
-                if server.playing >= 90 and server.id ~= game.JobId then
-                    ts:TeleportToPlaceInstance(currentId, server.id, lp)
-                    task.wait(2)
+        
+        if success and data and data.data then
+            local validServers = {}
+            
+            -- Filter servers with 90+ players
+            for _, server in ipairs(data.data) do
+                if server.playing and server.playing >= 90 and server.id ~= game.JobId then
+                    table.insert(validServers, server)
                 end
             end
+            
+            -- Try each valid server
+            for _, server in ipairs(validServers) do
+                local hopSuccess, hopError = pcall(function()
+                    ts:TeleportToPlaceInstance(placeId, server.id, lp)
+                end)
+                
+                if hopSuccess then
+                    -- Success, we're teleporting
+                    return
+                end
+                -- If failed (server full), continue to next server silently
+            end
         end
+        
+        -- Wait before next batch of servers
         task.wait(2)
     end
-    ts:Teleport(currentId)
+    
+    -- If we exhausted all attempts, just teleport to any server
+    pcall(function()
+        ts:Teleport(placeId)
+    end)
 end
 
--- 3. FORCE ZOOM OUT
-pcall(function()
-    lp.CameraMaxZoomDistance = 400
-    lp.CameraMinZoomDistance = 400
-    task.delay(0.5, function()
+-- FORCE ZOOM OUT
+task.spawn(function()
+    pcall(function()
+        lp.CameraMaxZoomDistance = 400
+        lp.CameraMinZoomDistance = 400
+        task.wait(0.5)
         lp.CameraMinZoomDistance = 0.5
         lp.CameraMaxZoomDistance = 10000
     end)
 end)
 
--- 4. TELEPORT TO COORDS
+-- TELEPORT TO COORDS
 task.spawn(function()
     local char = lp.Character or lp.CharacterAdded:Wait()
     local hrp = char:WaitForChild("HumanoidRootPart", 10)
@@ -56,98 +84,231 @@ task.spawn(function()
     end
 end)
 
--- 5. UI SETUP (Based on your working code)
+-- UI SETUP
 local gui = Instance.new("ScreenGui")
-gui.Name = "InviteAllGUI"
+gui.Name = "FriendUtilityGUI"
 gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = lp:WaitForChild("PlayerGui")
 
-local fr = Instance.new("Frame")
-fr.Size = UDim2.fromOffset(260, 150) -- Made slightly taller for timer
-fr.Position = UDim2.new(1, -20, 1, -20)
-fr.AnchorPoint = Vector2.new(1, 1)
-fr.BackgroundColor3 = Color3.fromRGB(24, 26, 32)
-fr.Parent = gui
-Instance.new("UICorner", fr).CornerRadius = UDim.new(0, 14)
+local main = Instance.new("Frame")
+main.Name = "Main"
+main.Size = UDim2.fromOffset(300, 180)
+main.Position = UDim2.new(1, -20, 1, -20)
+main.AnchorPoint = Vector2.new(1, 1)
+main.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+main.BorderSizePixel = 0
+main.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = main
+
+local stroke = Instance.new("UIStroke")
+stroke.Color = Color3.fromRGB(50, 50, 60)
+stroke.Thickness = 1
+stroke.Transparency = 0.5
+stroke.Parent = main
+
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(22, 22, 30)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 15, 20))
+}
+gradient.Rotation = 45
+gradient.Parent = main
 
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, -20, 0, 28)
-title.Position = UDim2.fromOffset(10, 8)
-title.Text = "Friends Utility"
-title.TextColor3 = Color3.new(1,1,1)
+title.Name = "Title"
+title.Size = UDim2.new(1, -30, 0, 32)
+title.Position = UDim2.fromOffset(15, 12)
 title.BackgroundTransparency = 1
+title.Text = "FRIEND UTILITY"
 title.Font = Enum.Font.GothamBold
-title.Parent = fr
+title.TextSize = 16
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = main
 
-local timerLabel = Instance.new("TextLabel")
-timerLabel.Size = UDim2.new(1, -20, 0, 20)
-timerLabel.Position = UDim2.fromOffset(10, 30)
-timerLabel.Text = "Hopping in: 35s"
-timerLabel.TextColor3 = Color3.fromRGB(122, 255, 82)
-timerLabel.BackgroundTransparency = 1
-timerLabel.Parent = fr
+local divider = Instance.new("Frame")
+divider.Size = UDim2.new(1, -30, 0, 1)
+divider.Position = UDim2.fromOffset(15, 48)
+divider.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+divider.BorderSizePixel = 0
+divider.Parent = main
 
-local btn = Instance.new("TextButton")
-btn.Size = UDim2.new(1, -20, 0, 40)
-btn.Position = UDim2.fromOffset(10, 60)
-btn.Text = "Invite All"
-btn.BackgroundColor3 = Color3.fromRGB(122, 255, 82)
-btn.Parent = fr
-Instance.new("UICorner", btn)
+local stats = Instance.new("TextLabel")
+stats.Name = "Stats"
+stats.Size = UDim2.new(1, -30, 0, 22)
+stats.Position = UDim2.fromOffset(15, 58)
+stats.BackgroundTransparency = 1
+stats.Text = "Ready to send requests"
+stats.Font = Enum.Font.Gotham
+stats.TextSize = 13
+stats.TextColor3 = Color3.fromRGB(160, 170, 180)
+stats.TextXAlignment = Enum.TextXAlignment.Left
+stats.Parent = main
 
-local info = Instance.new("TextLabel")
-info.Size = UDim2.new(1, -20, 0, 22)
-info.Position = UDim2.fromOffset(10, 110)
-info.Text = "Ready."
-info.TextColor3 = Color3.fromRGB(190, 198, 210)
-info.BackgroundTransparency = 1
-info.Parent = fr
+local timer = Instance.new("TextLabel")
+timer.Name = "Timer"
+timer.Size = UDim2.new(1, -30, 0, 22)
+timer.Position = UDim2.fromOffset(15, 82)
+timer.BackgroundTransparency = 1
+timer.Text = "Server hop in: 35s"
+timer.Font = Enum.Font.GothamMedium
+timer.TextSize = 12
+timer.TextColor3 = Color3.fromRGB(122, 255, 82)
+timer.TextXAlignment = Enum.TextXAlignment.Left
+timer.Parent = main
 
--- Modern Friend Request Logic
+local addBtn = Instance.new("TextButton")
+addBtn.Name = "AddButton"
+addBtn.Size = UDim2.new(1, -30, 0, 38)
+addBtn.Position = UDim2.fromOffset(15, 115)
+addBtn.BackgroundColor3 = Color3.fromRGB(122, 255, 82)
+addBtn.BorderSizePixel = 0
+addBtn.AutoButtonColor = false
+addBtn.Text = "ADD ALL PLAYERS"
+addBtn.Font = Enum.Font.GothamBold
+addBtn.TextSize = 14
+addBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+addBtn.Parent = main
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 8)
+btnCorner.Parent = addBtn
+
+addBtn.MouseEnter:Connect(function()
+    addBtn.BackgroundColor3 = Color3.fromRGB(140, 255, 100)
+end)
+addBtn.MouseLeave:Connect(function()
+    addBtn.BackgroundColor3 = Color3.fromRGB(122, 255, 82)
+end)
+
+-- AUTOMATED FRIEND REQUEST
 local function inviteAll()
     if busy then return end
     busy = true
-    btn.Text = "Adding..."
+    addBtn.Text = "SENDING..."
+    addBtn.BackgroundColor3 = Color3.fromRGB(90, 200, 60)
     
-    local sent, already = 0, 0
-    local StarterGui = game:GetService("StarterGui")
-
-    for _, p in ipairs(plrs:GetPlayers()) do
-        if p ~= lp then
+    local sent = 0
+    local already = 0
+    local failed = 0
+    local consecutive = 0
+    
+    for _, player in ipairs(plrs:GetPlayers()) do
+        if player ~= lp then
             local isFriend = false
-            -- Check if already friends to skip unnecessary prompts
-            pcall(function() isFriend = lp:IsFriendsWith(p.UserId) end)
+            pcall(function()
+                isFriend = lp:IsFriendsWith(player.UserId)
+            end)
             
             if not isFriend then
-                -- This is the "Prompt" method you found
                 local success = pcall(function()
-                    StarterGui:SetCore("PromptSendFriendRequest", p)
+                    lp:RequestFriendship(player)
                 end)
                 
                 if success then
-                    sent += 1
+                    sent = sent + 1
+                    consecutive = consecutive + 1
+                    stats.Text = string.format("Sent: %d | Already: %d | Failed: %d", sent, already, failed)
+                else
+                    failed = failed + 1
                 end
-                task.wait(0.8) -- Important: Don't lower this too much or the UI will glitch
             else
-                already += 1
+                already = already + 1
             end
+            
+            local delay = 1.2 + (math.random(-200, 300) / 1000)
+            if consecutive > 0 and consecutive % 10 == 0 then
+                delay = delay + math.random(2, 4)
+                stats.Text = "Pattern break delay..."
+            end
+            
+            task.wait(delay)
         end
     end
     
-    info.Text = ("Sent: %d | Already Friends: %d"):format(sent, already)
-    btn.Text = "Add All"
+    task.wait(1)
+    stats.Text = string.format("✓ Complete - Sent: %d | Already: %d", sent, already)
+    addBtn.Text = "ADD ALL PLAYERS"
+    addBtn.BackgroundColor3 = Color3.fromRGB(122, 255, 82)
     busy = false
 end
 
-btn.MouseButton1Click:Connect(inviteAll)
+addBtn.MouseButton1Click:Connect(inviteAll)
 
--- 7. AUTO-HOP TIMER
+-- Disable TeleportService error GUI
+pcall(function()
+    sg:SetCore("TopbarEnabled", true)
+end)
+
+-- Hide default teleport error messages
+local function hideTeleportErrors()
+    for _, gui in pairs(lp.PlayerGui:GetChildren()) do
+        if gui.Name:find("Teleport") or gui.Name:find("Error") then
+            pcall(function() gui:Destroy() end)
+        end
+    end
+end
+
+lp.PlayerGui.ChildAdded:Connect(function(child)
+    if child.Name:find("Teleport") or child.Name:find("Error") then
+        task.wait(0.1)
+        pcall(function() child:Destroy() end)
+    end
+end)
+
+-- AUTO SERVER HOP TIMER
 task.spawn(function()
     local timeLeft = 35
     while timeLeft > 0 do
-        timerLabel.Text = "Hopping in: " .. timeLeft .. "s"
+        timer.Text = string.format("Server hop in: %ds", timeLeft)
+        hideTeleportErrors()  -- Keep cleaning errors
         task.wait(1)
-        timeLeft -= 1
+        timeLeft = timeLeft - 1
     end
+    
+    timer.Text = "Finding server..."
+    timer.TextColor3 = Color3.fromRGB(255, 100, 100)
+    task.wait(1)
     serverHop()
 end)
+
+-- DRAGGABLE UI
+local dragging = false
+local dragInput, dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+end
+
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+title.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
+
+print("[+] Friend Utility loaded - Auto hopper fixed")
