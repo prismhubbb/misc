@@ -13,7 +13,7 @@ repeat task.wait() until lp
 local isHopping = false
 local busy = false
 
--- 1. ERROR SUPPRESSION (Removes the "Server Full" or "Teleport Failed" GUI)
+-- 1. ERROR SUPPRESSION
 ts.TeleportInitFailed:Connect(function(player, result, errorMessage)
     if player == lp then
         pcall(function()
@@ -23,7 +23,7 @@ ts.TeleportInitFailed:Connect(function(player, result, errorMessage)
     end
 end)
 
--- 2. SERVER HOPPING (RELIABLE CONTINUOUS LOOP)
+-- 2. SERVER HOPPING (FIXED TO CONTINUOUSLY LOOP)
 local function serverHop()
     if isHopping then return end
     isHopping = true
@@ -33,7 +33,7 @@ local function serverHop()
     local cursor = ""
     
     while isHopping do
-        local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Desc&limit=100"
+        local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100", placeId)
         if cursor ~= "" then
             url = url .. "&cursor=" .. cursor
         end
@@ -180,7 +180,7 @@ addBtn.MouseLeave:Connect(function()
     addBtn.BackgroundColor3 = Color3.fromRGB(122, 255, 82)
 end)
 
--- AUTOMATED FRIEND REQUEST (RESTORED TO ORIGINAL)
+-- 3. AUTOMATED FRIEND REQUEST (STRICTLY YOUR LOGIC)
 local function inviteAll()
     if busy then return end
     busy = true
@@ -234,7 +234,7 @@ end
 
 addBtn.MouseButton1Click:Connect(inviteAll)
 
--- Hide default teleport error messages
+-- UI CLEANUP FOR ERRORS
 local function hideTeleportErrors()
     for _, gui in pairs(lp.PlayerGui:GetChildren()) do
         if gui.Name:find("Teleport") or gui.Name:find("Error") then
@@ -301,4 +301,4 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
-print("[+] Friend Utility loaded - Hopper loop fixed & Original Add Logic Restored")
+print("[+] Friend Utility loaded - Continuous Hopper & RequestFriendship Logic")
