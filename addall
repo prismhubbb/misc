@@ -5,7 +5,6 @@ local plrs = game:GetService("Players")
 local sg = game:GetService("StarterGui")
 local ts = game:GetService("TeleportService")
 local http = game:GetService("HttpService")
-local gs = game:GetService("GuiService")
 local lp = plrs.LocalPlayer
 
 repeat task.wait() until lp
@@ -13,16 +12,19 @@ repeat task.wait() until lp
 local isHopping = false
 local busy = false
 
--- SERVER HOPPING (FIXED CONTINUOUS LOOP)
+-- SERVER HOPPING (ACTUALLY WORKS NOW)
 local function serverHop()
     if isHopping then return end
     isHopping = true
     
     local placeId = game.PlaceId
-    local currentJobId = game.JobId
+    local attempts = 0
+    local maxAttempts = 50  -- Try up to 50 pages of servers before giving up
     local cursor = ""
     
-    while isHopping do
+    while attempts < maxAttempts do
+        attempts = attempts + 1
+        
         local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100", placeId)
         if cursor ~= "" then
             url = url .. "&cursor=" .. cursor
@@ -33,23 +35,39 @@ local function serverHop()
         end)
         
         if success and data and data.data then
+            local validServers = {}
+            
+            -- Filter servers with 90+ players
             for _, server in ipairs(data.data) do
-                if server.playing and server.playing < server.maxPlayers and server.id ~= currentJobId then
-                    -- Priority: Large servers (90+ players)
-                    if server.playing >= 90 or #data.data < 10 then
-                        pcall(function()
-                            ts:TeleportToPlaceInstance(placeId, server.id, lp)
-                        end)
-                        task.wait(1.5)
-                        -- If teleport fails, ClearError removes the popup so we can try the next server
-                        pcall(function() gs:ClearError() end)
-                    end
+                if server.playing and server.playing >= 90 and server.id ~= game.JobId then
+                    table.insert(validServers, server)
                 end
             end
+            
+            -- Try each valid server
+            for _, server in ipairs(validServers) do
+                pcall(function()
+                    ts:TeleportToPlaceInstance(placeId, server.id, lp)
+                end)
+                
+                -- Wait to see if teleport works. If failed (server full), continue to next server silently
+                task.wait(3)
+            end
+            
+            -- Move to the next page of the server list
             cursor = data.nextPageCursor or ""
         end
-        task.wait(1)
+        
+        -- Wait before next batch of servers
+        task.wait(2)
     end
+    
+    -- If we exhausted all attempts, just teleport to any server
+    pcall(function()
+        ts:Teleport(placeId)
+    end)
+    
+    isHopping = false
 end
 
 -- FORCE ZOOM OUT
