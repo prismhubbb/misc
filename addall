@@ -12,56 +12,66 @@ repeat task.wait() until lp
 local isHopping = false
 local busy = false
 
--- SERVER HOPPING (ACTUALLY WORKS NOW)
+-- SERVER HOPPING (FIXED LOGIC)
 local function serverHop()
     if isHopping then return end
     isHopping = true
     
     local placeId = game.PlaceId
-    local attempts = 0
-    local maxAttempts = 50  -- Try up to 50 servers before giving up
+    local currentJobId = game.JobId
     
-    while attempts < maxAttempts do
-        attempts = attempts + 1
+    -- Function to try and find a server
+    local function findServer(cursor)
+        local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Desc&limit=100"
+        if cursor then
+            url = url .. "&cursor=" .. cursor
+        end
         
-        local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100", placeId)
-        
-        local success, data = pcall(function()
+        local success, result = pcall(function()
             return http:JSONDecode(game:HttpGet(url))
         end)
         
-        if success and data and data.data then
-            local validServers = {}
-            
-            -- Filter servers with 90+ players
-            for _, server in ipairs(data.data) do
-                if server.playing and server.playing >= 90 and server.id ~= game.JobId then
-                    table.insert(validServers, server)
-                end
-            end
-            
-            -- Try each valid server
-            for _, server in ipairs(validServers) do
-                local hopSuccess, hopError = pcall(function()
-                    ts:TeleportToPlaceInstance(placeId, server.id, lp)
-                end)
-                
-                if hopSuccess then
-                    -- Success, we're teleporting
-                    return
-                end
-                -- If failed (server full), continue to next server silently
+        if success and result and result.data then
+            return result
+        end
+        return nil
+    end
+
+    local result = findServer()
+    if result then
+        local foundServer = nil
+        
+        -- Priority 1: Find 90+ player server
+        for _, server in ipairs(result.data) do
+            if server.playing and server.playing >= 90 and server.id ~= currentJobId then
+                foundServer = server.id
+                break
             end
         end
         
-        -- Wait before next batch of servers
-        task.wait(2)
+        -- Priority 2: If no 90+ server, find ANY server that isn't this one
+        if not foundServer then
+            for _, server in ipairs(result.data) do
+                if server.id ~= currentJobId and server.playing < server.maxPlayers then
+                    foundServer = server.id
+                    break
+                end
+            end
+        end
+        
+        if foundServer then
+            ts:TeleportToPlaceInstance(placeId, foundServer, lp)
+        else
+            -- Priority 3: Last resort, standard teleport
+            ts:Teleport(placeId, lp)
+        end
+    else
+        ts:Teleport(placeId, lp)
     end
     
-    -- If we exhausted all attempts, just teleport to any server
-    pcall(function()
-        ts:Teleport(placeId)
-    end)
+    -- Reset lock if teleport fails
+    task.wait(5)
+    isHopping = false
 end
 
 -- FORCE ZOOM OUT
@@ -239,11 +249,6 @@ end
 
 addBtn.MouseButton1Click:Connect(inviteAll)
 
--- Disable TeleportService error GUI
-pcall(function()
-    sg:SetCore("TopbarEnabled", true)
-end)
-
 -- Hide default teleport error messages
 local function hideTeleportErrors()
     for _, gui in pairs(lp.PlayerGui:GetChildren()) do
@@ -265,7 +270,7 @@ task.spawn(function()
     local timeLeft = 35
     while timeLeft > 0 do
         timer.Text = string.format("Server hop in: %ds", timeLeft)
-        hideTeleportErrors()  -- Keep cleaning errors
+        hideTeleportErrors()
         task.wait(1)
         timeLeft = timeLeft - 1
     end
