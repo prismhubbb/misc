@@ -1,0 +1,218 @@
+-- [[ PRISM HUB: INTERACTION-FIXED V17 ]]
+-- Pure Custom Lua | Interaction-Ghost | Unified Config | Idle Lock
+
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+
+-- [[ 1. THE NUCLEAR PURGE ]]
+local function Purge()
+    local names = {"PrismHub_V2", "PrismHub_V4", "PrismHub_Final", "PrismHub_V12", "PrismHub_V13", "PrismHub_V14", "PrismHub_V15", "PrismHub_V16", "PrismHub_V17", "ServerPosVisual"}
+    for _, loc in pairs({CoreGui, LP:FindFirstChild("PlayerGui"), workspace}) do
+        if loc then
+            for _, child in pairs(loc:GetChildren()) do
+                for _, name in pairs(names) do
+                    if child.Name == name or child:FindFirstChild("PRISM HUB") then
+                        child:Destroy()
+                    end
+                end
+            end
+        end
+    end
+end
+Purge()
+
+-- [[ 2. UNIFIED CONFIG SYSTEM ]]
+local FOLDER_NAME = "PrismHub_Configs"
+local FILE_NAME = FOLDER_NAME .. "/master_settings.json" -- Unified filename
+local Config = { Desync = false, Unwalk = false, ServerPos = false }
+
+if not isfolder(FOLDER_NAME) then makefolder(FOLDER_NAME) end
+
+local function Save() 
+    pcall(function() 
+        writefile(FILE_NAME, HttpService:JSONEncode(Config)) 
+    end)
+end
+
+local function Load()
+    if isfile(FILE_NAME) then
+        local success, result = pcall(function() return HttpService:JSONDecode(readfile(FILE_NAME)) end)
+        if success and type(result) == "table" then
+            for k, v in pairs(result) do 
+                if Config[k] ~= nil then Config[k] = v end 
+            end
+        end
+    end
+end
+Load()
+
+-- [[ 3. UI INITIALIZATION ]]
+local ScreenGui = Instance.new("ScreenGui", CoreGui or LP:WaitForChild("PlayerGui"))
+ScreenGui.Name = "PrismHub_V17"
+ScreenGui.ResetOnSpawn = false
+
+-- [[ 4. NOTIFICATION SYSTEM ]]
+local function Notify(title, text, state)
+    local Notif = Instance.new("Frame", ScreenGui)
+    Notif.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
+    Notif.Position = UDim2.new(1, 300, 0.9, -60)
+    Notif.Size = UDim2.new(0, 260, 0, 65)
+    Instance.new("UICorner", Notif).CornerRadius = UDim.new(0, 12)
+    local s = Instance.new("UIStroke", Notif)
+    s.Thickness = 1.5; s.Color = state and Color3.fromRGB(110, 115, 255) or Color3.fromRGB(255, 80, 80)
+
+    local Icon = Instance.new("ImageLabel", Notif)
+    Icon.BackgroundTransparency = 1; Icon.Position = UDim2.new(0, 15, 0.5, -15); Icon.Size = UDim2.new(0, 30, 0, 30)
+    Icon.Image = "rbxassetid://6034293019"; Icon.ImageColor3 = s.Color
+
+    local t = Instance.new("TextLabel", Notif)
+    t.Size = UDim2.new(1, -60, 0, 20); t.Position = UDim2.new(0, 55, 0, 12)
+    t.BackgroundTransparency = 1; t.Font = "GothamBold"; t.TextColor3 = Color3.new(1,1,1); t.Text = title:upper(); t.TextSize = 13; t.TextXAlignment = "Left"
+
+    local d = Instance.new("TextLabel", Notif)
+    d.Size = UDim2.new(1, -60, 0, 20); d.Position = UDim2.new(0, 55, 0, 30)
+    d.BackgroundTransparency = 1; d.Font = "Gotham"; d.TextColor3 = Color3.fromRGB(180, 180, 180); d.Text = text; d.TextSize = 12; d.TextXAlignment = "Left"
+
+    Notif:TweenPosition(UDim2.new(1, -280, 0.9, -60), "Out", "Back", 0.5, true)
+    task.delay(3, function()
+        if Notif and Notif.Parent then
+            Notif:TweenPosition(UDim2.new(1, 300, 0.9, -60), "In", "Quint", 0.5, true)
+            task.wait(0.5); if Notif then Notif:Destroy() end
+        end
+    end)
+end
+
+-- [[ 5. SERVER VISUALIZER (INTERACTION GHOST) ]]
+local ServerPosPart = Instance.new("Part")
+ServerPosPart.Name = "ServerPosVisual"
+ServerPosPart.Anchored = true
+ServerPosPart.CanCollide = false
+ServerPosPart.CanTouch = false -- Won't trigger touch interests
+ServerPosPart.CanQuery = false -- WONT INTERFERE WITH PROXIMITY PROMPTS/RAYCASTS
+ServerPosPart.Transparency = 1
+ServerPosPart.Size = Vector3.new(1, 1, 1)
+
+local Ring = Instance.new("Part", ServerPosPart)
+Ring.Anchored = true; Ring.CanCollide = false; Ring.CanTouch = false; Ring.CanQuery = false
+Ring.Material = Enum.Material.Neon; Ring.Size = Vector3.new(6, 0.05, 6)
+local RingMesh = Instance.new("SpecialMesh", Ring)
+RingMesh.MeshType = Enum.MeshType.FileMesh; RingMesh.MeshId = "rbxassetid://3270017"; RingMesh.Scale = Vector3.new(8, 8, 1.2)
+
+local Billboard = Instance.new("BillboardGui", ServerPosPart)
+Billboard.Size = UDim2.new(0, 140, 0, 60); Billboard.AlwaysOnTop = true; Billboard.StudsOffset = Vector3.new(0, 4.5, 0)
+local TagFrame = Instance.new("Frame", Billboard)
+TagFrame.Size = UDim2.new(1, 0, 1, 0); TagFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 20); TagFrame.BackgroundTransparency = 0.2
+Instance.new("UICorner", TagFrame); local TagStroke = Instance.new("UIStroke", TagFrame); TagStroke.Thickness = 2.5
+local TagTitle = Instance.new("TextLabel", TagFrame)
+TagTitle.Size = UDim2.new(1, 0, 0.5, 0); TagTitle.BackgroundTransparency = 1; TagTitle.Font = "GothamBold"; TagTitle.TextColor3 = Color3.new(1,1,1); TagTitle.Text = "SERVER POS"; TagTitle.TextSize = 11
+local DistLabel = Instance.new("TextLabel", TagFrame)
+DistLabel.Size = UDim2.new(1, 0, 0.4, 0); DistLabel.Position = UDim2.new(0,0,0.5,0); DistLabel.BackgroundTransparency = 1; DistLabel.Font = "GothamMedium"; DistLabel.TextColor3 = Color3.fromRGB(200, 200, 255); DistLabel.Text = "0.0m"; DistLabel.TextSize = 10
+
+local currentServerPos = Vector3.new(0,0,0)
+local lastKnownLocalPos = Vector3.new(0,0,0)
+
+RunService.PostSimulation:Connect(function()
+    if LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") then
+        local root = LP.Character.HumanoidRootPart
+        if not Config.Desync then
+            currentServerPos = root.Position
+        else
+            local delta = (root.Position - lastKnownLocalPos).Magnitude
+            if delta > 1.5 and delta < 500 then currentServerPos = root.Position end
+        end
+        lastKnownLocalPos = root.Position
+        if Config.ServerPos then
+            ServerPosPart.Position = currentServerPos
+            Ring.CFrame = CFrame.new(currentServerPos) * CFrame.Angles(math.rad(90), 0, math.rad(tick()*90))
+            local color = Color3.fromHSV(tick() % 4 / 4, 0.8, 1)
+            Ring.Color = color; TagStroke.Color = color
+            DistLabel.Text = string.format("%.1fm", (root.Position - currentServerPos).Magnitude)
+            ServerPosPart.Parent = workspace
+        else ServerPosPart.Parent = nil end
+    end
+end)
+
+-- [[ 6. MAIN HUB UI ]]
+local MainFrame = Instance.new("Frame", ScreenGui)
+MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 12); MainFrame.Position = UDim2.new(0.5, -140, 0.4, -100); MainFrame.Size = UDim2.new(0, 280, 0, 250)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 14); Instance.new("UIStroke", MainFrame).Color = Color3.fromRGB(50, 50, 65)
+
+local Header = Instance.new("Frame", MainFrame)
+Header.Size = UDim2.new(1, 0, 0, 50); Header.BackgroundTransparency = 1
+local Title = Instance.new("TextLabel", Header)
+Title.Size = UDim2.new(1, 0, 1, 0); Title.BackgroundTransparency = 1; Title.Font = "GothamBold"; Title.RichText = true
+Title.Text = "PRISM <font color='#6E73FF'>HUB</font>"; Title.TextColor3 = Color3.new(1,1,1); Title.TextSize = 15
+
+-- [[ 7. REFACTORED TOGGLE FACTORY ]]
+local function CreateToggle(name, configKey, yPos, callback)
+    local TContainer = Instance.new("Frame", MainFrame)
+    TContainer.BackgroundColor3 = Color3.fromRGB(20, 20, 25); TContainer.Position = UDim2.new(0.05, 0, 0, yPos); TContainer.Size = UDim2.new(0.9, 0, 0, 55)
+    Instance.new("UICorner", TContainer).CornerRadius = UDim.new(0, 10)
+
+    local Label = Instance.new("TextLabel", TContainer)
+    Label.BackgroundTransparency = 1; Label.Position = UDim2.new(0, 15, 0, 0); Label.Size = UDim2.new(0.6, 0, 1, 0)
+    Label.Font = "GothamMedium"; Label.Text = name; Label.TextColor3 = Color3.fromRGB(220, 220, 220); Label.TextSize = 14; Label.TextXAlignment = "Left"
+
+    local Switch = Instance.new("TextButton", TContainer)
+    Switch.BackgroundColor3 = Config[configKey] and Color3.fromRGB(110, 115, 255) or Color3.fromRGB(40, 40, 48)
+    Switch.Position = UDim2.new(1, -60, 0.5, -13); Switch.Size = UDim2.new(0, 48, 0, 26); Switch.Text = ""
+    Instance.new("UICorner", Switch).CornerRadius = UDim.new(1, 0)
+
+    local Bullet = Instance.new("Frame", Switch)
+    Bullet.BackgroundColor3 = Color3.new(1,1,1); Bullet.Position = Config[configKey] and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 4, 0.5, -9)
+    Bullet.Size = UDim2.new(0, 18, 0, 18); Instance.new("UICorner", Bullet).CornerRadius = UDim.new(1, 0)
+
+    task.spawn(function() callback(Config[configKey], true) end)
+
+    Switch.MouseButton1Click:Connect(function()
+        Config[configKey] = not Config[configKey]
+        local active = Config[configKey]
+        
+        TweenService:Create(Bullet, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+            Position = active and UDim2.new(1, -22, 0.5, -9) or UDim2.new(0, 4, 0.5, -9)
+        }):Play()
+        TweenService:Create(Switch, TweenInfo.new(0.2), {
+            BackgroundColor3 = active and Color3.fromRGB(110, 115, 255) or Color3.fromRGB(40, 40, 48)
+        }):Play()
+        
+        Save()
+        callback(active, false)
+    end)
+end
+
+CreateToggle("Desync Network", "Desync", 55, function(state, silent)
+    if raknet and raknet.desync then raknet.desync(state) end
+    if not silent then Notify("Desync", state and "Mode: Desynced" or "Mode: Synced", state) end
+end)
+
+CreateToggle("Unwalk (Idle)", "Unwalk", 120, function(state, silent)
+    local c = LP.Character; local h = c and c:FindFirstChildOfClass("Humanoid")
+    local a = c and c:FindFirstChild("Animate")
+    
+    if state then
+        if a then a.Disabled = true end
+        if h then 
+            for _, v in pairs(h:GetPlayingAnimationTracks()) do v:Stop() end
+            local idle = a and a:FindFirstChild("idle") and a.idle:FindFirstChildOfClass("Animation")
+            if idle then local t = h:LoadAnimation(idle); t.Looped = true; t:Play() end
+        end
+    else
+        if a then a.Disabled = false end
+    end
+    if not silent then Notify("Unwalk", state and "Idle Lock Active" or "Animations Restored", state) end
+end)
+
+CreateToggle("Server Position", "ServerPos", 185, function(state, silent)
+    if not silent then Notify("Visuals", state and "Ghost Tracker On" or "Tracker Off", state) end
+end)
+
+-- [[ 8. DRAGGING ]]
+local drag, start, startP
+Header.InputBegan:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = true; start = i.Position; startP = MainFrame.Position end end)
+UserInputService.InputChanged:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseMovement and drag then local d = i.Position - start; MainFrame.Position = UDim2.new(startP.X.Scale, startP.X.Offset + d.X, startP.Y.Scale, startP.Y.Offset + d.Y) end end)
+UserInputService.InputEnded:Connect(function(i) if i.UserInputType == Enum.UserInputType.MouseButton1 then drag = false end end)
