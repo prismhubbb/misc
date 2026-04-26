@@ -17,9 +17,9 @@ local busy = false
 ts.TeleportInitFailed:Connect(function(player, result, errorMessage)
     if player == lp then
         pcall(function()
-            gs:ClearError() -- Instantly removes the error popup
+            gs:ClearError() 
         end)
-        isHopping = false -- Reset lock so the loop can try again
+        isHopping = false 
     end
 end)
 
@@ -32,7 +32,6 @@ local function serverHop()
     local currentJobId = game.JobId
     local cursor = ""
     
-    -- This loop ensures it keeps trying until you actually teleport
     while isHopping do
         local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Desc&limit=100"
         if cursor ~= "" then
@@ -45,20 +44,16 @@ local function serverHop()
         
         if success and result and result.data then
             for _, server in ipairs(result.data) do
-                if server.id ~= currentJobId and server.playing < server.maxPlayers then
-                    -- Priority: 90+ players, otherwise just take the best available
+                if server.id ~= currentJobId and server.playing and server.playing < server.maxPlayers then
                     if server.playing >= 90 or #result.data < 10 then
                         pcall(function()
                             ts:TeleportToPlaceInstance(placeId, server.id, lp)
                         end)
-                        task.wait(2) -- Wait for teleport to initiate or error to fire
+                        task.wait(2)
                     end
                 end
             end
-            
-            -- Move to next page if we didn't hop yet
             cursor = result.nextPageCursor or ""
-            if cursor == "" then cursor = "" end -- Reset to start if at end
         end
         task.wait(1)
     end
@@ -185,7 +180,7 @@ addBtn.MouseLeave:Connect(function()
     addBtn.BackgroundColor3 = Color3.fromRGB(122, 255, 82)
 end)
 
--- AUTOMATED FRIEND REQUEST
+-- AUTOMATED FRIEND REQUEST (RESTORED TO ORIGINAL)
 local function inviteAll()
     if busy then return end
     busy = true
@@ -306,4 +301,4 @@ game:GetService("UserInputService").InputChanged:Connect(function(input)
     end
 end)
 
-print("[+] Friend Utility loaded - Auto hopper loop fixed & Errors cleared")
+print("[+] Friend Utility loaded - Hopper loop fixed & Original Add Logic Restored")
